@@ -1,3 +1,32 @@
+## 1.4.0
+* Android: Add clear gatt cache method #142 (thanks to joistaus)
+* Android: Opt-out of the `neverForLocation` permission flag for the `BLUETOOTH_SCAN` permission. (thanks to navaronbracke)
+
+  If `neverForLocation` is desired,
+  opt back into the old behavior by adding an explicit entry to your Android Manifest:
+  ```
+  <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
+    android:usesPermissionFlags="neverForLocation" />
+  ```
+* Android: Scan BLE long range -devices #139 (thanks to jonik-dev)
+* Android: Prevent deprecation warnings #107 (thanks to sqcsabbey)
+* Allow native implementation to handle pairing request #109 (thanks to JRazek)
+
+## 1.3.1
+* Reverted: Ios: fixed manufacturer data parsing #104 (thanks to sqcsabbey)
+
+## 1.3.0
+* Ios: fixed manufacturer data parsing #104 (thanks to sqcsabbey)
+* Ios: Fixed an error when calling the connect method of a connected device #106 (thanks to figureai)
+* Android: Scan Filter by Mac Address #57 (thanks to  Zyr00)
+* Upgrading to linter 2.0.1, excluding generated ProtoBuf files from linting. (thanks to MrCsabaToth)
+
+## 1.2.0
+* connect timeout fixed (thanks to crazy-rodney, sophisticode, SkuggaEdward, MousyBusiness and cthurston)
+* Add timestamp field to ScanResult class #59 (thanks to simon-iversen)
+* Add FlutterBlue.name to get the human readable device name #93 (thanks to mvo5)
+* Fix bug where if there were multiple subscribers to FlutterBlue.state and one cancelled it would accidentally cancel all subscribers (thank to MacMalainey and MrCsabaToth)
+
 ## 1.1.3
 * Read RSSI from a connected BLE device #1 (thanks to sophisticode)
 * Fixed a crash on Android OS 12 (added check for BLUETOOTH_CONNECT permission) (fixed by dspells)

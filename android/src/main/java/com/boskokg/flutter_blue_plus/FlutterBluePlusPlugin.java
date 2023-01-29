@@ -43,7 +43,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+import java.lang.reflect.Method;
+
 import androidx.annotation.NonNull;
+import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
@@ -227,6 +230,15 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
         break;
       }
 
+      case "name":
+      {
+        String name = mBluetoothAdapter.getName();
+        if (name == null)
+          name = "";
+        result.success(name);
+        break;
+      }
+
       case "turnOn":
       {
         if (!mBluetoothAdapter.isEnabled()) {
@@ -347,6 +359,42 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
           mDevices.put(deviceId, new BluetoothDeviceCache(gattServer));
           result.success(null);
         });
+        break;
+      }
+
+      case "pair":
+      {
+        String deviceId = (String)call.arguments;
+        BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(deviceId);
+        device.createBond();
+        result.success(null);
+        break;
+      }
+
+      case "clearGattCache":
+      {
+        String deviceId = (String)call.arguments;
+        BluetoothDeviceCache cache = mDevices.get(deviceId);
+
+        Boolean hasCleared = false;
+
+        if (cache != null) {
+          BluetoothGatt gattServer = cache.gatt;
+          try {
+            final Method refresh = gattServer.getClass().getMethod("refresh");
+            if (refresh != null){
+              hasCleared = (Boolean) refresh.invoke(gattServer);
+            }
+          }catch (Exception e){
+            Log.d("clearGattCache", e.toString());
+          }
+
+          Log.d("clearGattCache", "CLEAR GATT CACHE: " + hasCleared);
+          result.success(null);
+        } else {
+          result.error("clearGattCache", "no instance of BluetoothGatt, have you connected first?", null);
+        }
+
         break;
       }
 
@@ -856,15 +904,42 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
     BluetoothLeScanner scanner = mBluetoothAdapter.getBluetoothLeScanner();
     if(scanner == null) throw new IllegalStateException("getBluetoothLeScanner() is null. Is the Adapter on?");
     int scanMode = proto.getAndroidScanMode();
-    int count = proto.getServiceUuidsCount();
-    List<ScanFilter> filters = new ArrayList<>(count);
-    for(int i = 0; i < count; i++) {
-      String uuid = proto.getServiceUuids(i);
-      ScanFilter f = new ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(uuid)).build();
+    List<ScanFilter> filters = fetchFilters(proto);
+    ScanSettings settings;
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      settings = new ScanSettings.Builder()
+              .setPhy(ScanSettings.PHY_LE_ALL_SUPPORTED)
+              .setLegacy(false)
+              .setScanMode(scanMode)
+              .build();
+    } else {
+      settings = new ScanSettings.Builder().setScanMode(scanMode).build();
+    }
+    scanner.startScan(filters, settings, getScanCallback21());
+  }
+
+  @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+  private List<ScanFilter> fetchFilters(Protos.ScanSettings proto) {
+    List<ScanFilter> filters;
+
+    int macCount = proto.getMacAddressesCount();
+    int serviceCount = proto.getServiceUuidsCount();
+    int count = macCount > 0 ? macCount : serviceCount;
+    filters = new ArrayList<>(count);
+
+    for (int i = 0; i < count; i++) {
+      ScanFilter f;
+      if (macCount > 0) {
+        String macAddress = proto.getMacAddresses(i);
+        f = new ScanFilter.Builder().setDeviceAddress(macAddress).build();
+      } else {
+        String uuid = proto.getServiceUuids(i);
+        f = new ScanFilter.Builder().setServiceUuid(ParcelUuid.fromString(uuid)).build();
+      }
       filters.add(f);
     }
-    ScanSettings settings = new ScanSettings.Builder().setScanMode(scanMode).build();
-    scanner.startScan(filters, settings, getScanCallback21());
+
+    return filters;
   }
 
   @TargetApi(21)
@@ -890,6 +965,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
     return scanCallback18;
   }
 
+  @SuppressWarnings("deprecation")
   private void startScan18(Protos.ScanSettings proto) throws IllegalStateException {
     List<String> serviceUuids = proto.getServiceUuidsList();
     UUID[] uuids = new UUID[serviceUuids.size()];
@@ -900,6 +976,7 @@ public class FlutterBluePlusPlugin implements FlutterPlugin, MethodCallHandler, 
     if(!success) throw new IllegalStateException("getBluetoothLeScanner() is null. Is the Adapter on?");
   }
 
+  @SuppressWarnings("deprecation")
   private void stopScan18() {
     mBluetoothAdapter.stopLeScan(getScanCallback18());
   }

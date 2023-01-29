@@ -32,30 +32,43 @@ class BluetoothDevice {
     Duration? timeout,
     bool autoConnect = true,
   }) async {
-    final completer = Completer<void>();
     var request = protos.ConnectRequest.create()
       ..remoteId = id.toString()
       ..androidAutoConnect = autoConnect;
 
-    Timer? timer;
-    if (timeout != null) {
-      timer = Timer(timeout, () {
-        disconnect();
-        completer.completeError(
-            TimeoutException('Failed to connect in time.', timeout));
-      });
-    }
-
     await FlutterBluePlus.instance._channel
         .invokeMethod('connect', request.writeToBuffer());
 
-    await state.firstWhere((s) => s == BluetoothDeviceState.connected);
+    if (timeout == null) {
+      await state.firstWhere((s) => s == BluetoothDeviceState.connected);
+    } else {
+      await state
+          .firstWhere((s) => s == BluetoothDeviceState.connected)
+          .timeout(
+        timeout,
+        onTimeout: () {
+          disconnect();
+          throw TimeoutException('Failed to connect in time.', timeout);
+        },
+      );
+    }
+  }
 
-    timer?.cancel();
+  /// Send a pairing request to the device.
+  /// Currently only implemented on Android.
+  Future<void> pair() async {
+    return FlutterBluePlus.instance._channel
+        .invokeMethod('pair', id.toString());
+  }
 
-    completer.complete();
-
-    return completer.future;
+  /// Refresh Gatt Device Cache
+  /// Emergency method to reload ble services & characteristics
+  /// Currently only implemented on Android.
+  Future<void> clearGattCache() async {
+    if (Platform.isAndroid) {
+      return FlutterBluePlus.instance._channel
+          .invokeMethod('clearGattCache', id.toString());
+    }
   }
 
   /// Cancels connection to the Bluetooth Device
